@@ -4,14 +4,7 @@
 
 ![rounded rect vs squircle](rounded_rect_vs_squircle.png)
 
-## Installation
-
-gpui is still in development so you need to add the dependencies via git.
-
-```sh
-gpui = { git = "https://github.com/zed-industries/zed.git" }
-gpui_squircle = { git = "https://github.com/gpui-tesserae/gpui_squircle.git" }
-```
+Install via [crates.io](https://crates.io/crates/gpui_squircle)
 
 ## Usage
 
@@ -26,7 +19,7 @@ fn squircle_div() -> impl gpui::IntoElement {
         .child(
             // To use a squircle simply parent it to an element.
             // It automatically fills the parent's entire size
-            // whilst also ignoring padding. 
+            // whilst also ignoring padding.
             squircle()
                 .rounded(px(25.))
                 .bg(gpui::red())
