@@ -1,66 +1,105 @@
-use gpui::{App, Background, Bounds, PathBuilder, Pixels, Size, Window, canvas, point, prelude::*, px};
-use lyon::{extra::parser::{ParserOptions, PathParser, Source}, path::Path as LyonPath};
 use figma_squircle::{FigmaSquircleParams, get_svg_path};
+use gpui::{
+    App, Background, Bounds, Element, ElementId, GlobalElementId, InspectorElementId,
+    InteractiveElement, Interactivity, IntoElement, LayoutId, PathBuilder, Pixels, Refineable,
+    Size, StatefulInteractiveElement, Style, StyleRefinement, Styled, Window, point, px,
+};
+use lyon::{
+    extra::parser::{ParserOptions, PathParser, Source},
+    path::Path as LyonPath,
+};
 
-mod style_trait;
-pub use style_trait::*;
+mod style;
+pub use style::{SquircleStyleRefinement, Styled as SquircleStyled};
 
 struct BuildAndPaintOptions {
     builder: PathBuilder,
-    background: Background
+    background: Background,
 }
 
 impl BuildAndPaintOptions {
     fn fill(background: Background) -> Self {
         Self {
             builder: PathBuilder::fill(),
-            background
+            background,
         }
     }
 
     fn stroke(background: Background, border_width: f32) -> Self {
         Self {
             builder: PathBuilder::stroke(px(border_width)),
-            background
+            background,
         }
     }
 }
 
-#[derive(IntoElement)]
-pub struct Squircle {
-    squircle_styles: SquircleStyles
+#[derive(Default, Clone, Copy)]
+pub enum BorderMode {
+    #[default]
+    Center,
+    Outside,
+    Inside,
 }
 
-impl SquircleStylable for Squircle {
-    fn get_squircle_styles_mut(&mut self) -> &mut SquircleStyles {
-        &mut self.squircle_styles
+pub struct Squircle {
+    pub style: SquircleStyleRefinement,
+    interactivity: Interactivity,
+}
+
+impl SquircleStyled for Squircle {
+    fn style(&mut self) -> &mut StyleRefinement {
+        &mut self.style.inner
+    }
+
+    fn outer_style(&mut self) -> &mut SquircleStyleRefinement {
+        &mut self.style
     }
 }
 
 impl Squircle {
     fn new() -> Self {
         Self {
-            squircle_styles: SquircleStyles::default()
+            style: SquircleStyleRefinement::default(),
+            interactivity: Interactivity::new(),
         }
     }
 
+    pub fn absolute_expand(mut self) -> Self {
+        self.style.inner = self
+            .style
+            .inner
+            .size_full()
+            .absolute()
+            .top_0()
+            .bottom_0()
+            .left_0()
+            .right_0();
+
+        self
+    }
+
     fn to_params(&self, width: f32, height: f32, border_offset: f32) -> FigmaSquircleParams {
-        let squircle_styles = &self.squircle_styles;
+        let style = &self.style;
+        let corner_radii = &self.style.corner_radii;
 
         FigmaSquircleParams {
-            corner_radius: squircle_styles.corner_radius
-                .map(|x| x - border_offset),
-            top_left_corner_radius: squircle_styles.top_left_corner_radius
-                .map(|x| x - border_offset),
-            top_right_corner_radius: squircle_styles.top_right_corner_radius
-                .map(|x| x - border_offset),
-            bottom_right_corner_radius: squircle_styles.bottom_right_corner_radius
-                .map(|x| x - border_offset),
-            bottom_left_corner_radius: squircle_styles.bottom_left_corner_radius
-                .map(|x| x - border_offset),
-            corner_smoothing: squircle_styles.corner_smoothing.unwrap_or(1.),
-            width, height,
-            preserve_smoothing: squircle_styles.preserve_smoothing.unwrap_or(true)
+            width,
+            height,
+            corner_radius: None,
+            top_left_corner_radius: Some(
+                corner_radii.top_left.unwrap_or_default().to_f64() as f32 + border_offset,
+            ),
+            top_right_corner_radius: Some(
+                corner_radii.top_right.unwrap_or_default().to_f64() as f32 + border_offset,
+            ),
+            bottom_left_corner_radius: Some(
+                corner_radii.bottom_left.unwrap_or_default().to_f64() as f32 + border_offset,
+            ),
+            bottom_right_corner_radius: Some(
+                corner_radii.bottom_right.unwrap_or_default().to_f64() as f32 + border_offset,
+            ),
+            corner_smoothing: style.corner_smoothing.unwrap_or(px(1.)).to_f64() as f32,
+            preserve_smoothing: style.preserve_smoothing.unwrap_or(true),
         }
     }
 
@@ -68,22 +107,21 @@ impl Squircle {
         let svg_path = get_svg_path(self.to_params(
             size.width.to_f64() as f32,
             size.height.to_f64() as f32,
-            border_offset
+            border_offset,
         ));
 
         let mut lyon_builder = LyonPath::builder();
-        
-        let parsed = PathParser::new()
-            .parse(
-                &ParserOptions::DEFAULT,
-                &mut Source::new(svg_path.chars()),
-                &mut lyon_builder
-            );
+
+        let parsed = PathParser::new().parse(
+            &ParserOptions::DEFAULT,
+            &mut Source::new(svg_path.chars()),
+            &mut lyon_builder,
+        );
 
         if parsed.is_err() {
-            return None
+            return None;
         }
-        
+
         Some(lyon_builder.build())
     }
 
@@ -91,23 +129,23 @@ impl Squircle {
         &self,
         window: &mut Window,
         Bounds { origin, size }: Bounds<Pixels>,
+        size_offset: f32,
         border_offset: f32,
-        mut options: [BuildAndPaintOptions; N]
+        mut options: [BuildAndPaintOptions; N],
     ) {
-        let border_offset_px = px(border_offset);
-
-        let size = size - gpui::size(
-            border_offset_px,
-            border_offset_px
-        );
+        let size_offset_px = px(size_offset);
+        let size = size - gpui::size(size_offset_px, size_offset_px);
 
         // If the path doesn't exist then the svg is malformed.
         // TODO: fallback to regular rounded rectangle if this case is met.
-        let Some(path) = self.build_lyon_path(size, border_offset) else { println!("malformed svg"); return };
+        let Some(path) = self.build_lyon_path(size, border_offset) else {
+            //println!("malformed svg");
+            return;
+        };
 
-        let (Pixels(origin_x), Pixels(origin_y)) = (
-            origin.x + border_offset_px / 2.,
-            origin.y + border_offset_px / 2.
+        let (origin_x, origin_y) = (
+            (origin.x + size_offset_px / 2.).to_f64() as f32,
+            (origin.y + size_offset_px / 2.).to_f64() as f32,
         );
 
         for event in path.iter() {
@@ -115,42 +153,39 @@ impl Squircle {
                 lyon::path::Event::Begin { at } => {
                     let at = point(px(origin_x + at.x), px(origin_y + at.y));
 
-                    for BuildAndPaintOptions {
-                        builder, ..
-                    } in options.as_mut() {
+                    for BuildAndPaintOptions { builder, .. } in options.as_mut() {
                         builder.move_to(at)
                     }
                 }
 
-                lyon::path::Event::Line { from:_, to } => {
+                lyon::path::Event::Line { from: _, to } => {
                     let to = point(px(origin_x + to.x), px(origin_y + to.y));
 
-                    for BuildAndPaintOptions {
-                        builder, ..
-                    } in options.as_mut() {
+                    for BuildAndPaintOptions { builder, .. } in options.as_mut() {
                         builder.line_to(to)
                     }
                 }
 
-                lyon::path::Event::Quadratic { from:_, ctrl, to } => {
+                lyon::path::Event::Quadratic { from: _, ctrl, to } => {
                     let to = point(px(origin_x + to.x), px(origin_y + to.y));
                     let ctrl = point(px(origin_x + ctrl.x), px(origin_y + ctrl.y));
 
-                    for BuildAndPaintOptions {
-                        builder, ..
-                    } in options.as_mut() {
+                    for BuildAndPaintOptions { builder, .. } in options.as_mut() {
                         builder.curve_to(to, ctrl);
                     }
                 }
 
-                lyon::path::Event::Cubic { from:_, ctrl1, ctrl2, to } => {
+                lyon::path::Event::Cubic {
+                    from: _,
+                    ctrl1,
+                    ctrl2,
+                    to,
+                } => {
                     let to = point(px(origin_x + to.x), px(origin_y + to.y));
                     let ctrl1 = point(px(origin_x + ctrl1.x), px(origin_y + ctrl1.y));
                     let ctrl2 = point(px(origin_x + ctrl2.x), px(origin_y + ctrl2.y));
 
-                    for BuildAndPaintOptions {
-                        builder, ..
-                    } in options.as_mut() {
+                    for BuildAndPaintOptions { builder, .. } in options.as_mut() {
                         builder.cubic_bezier_to(to, ctrl1, ctrl2)
                     }
                 }
@@ -165,89 +200,169 @@ impl Squircle {
             }
         }
 
-        for BuildAndPaintOptions { builder, background, .. } in options {
+        for BuildAndPaintOptions {
+            builder,
+            background,
+            ..
+        } in options
+        {
             let Ok(path) = builder.build() else { continue };
             window.paint_path(path, background);
         }
     }
 
     #[inline(always)]
-    fn get_border_offset(&self, border_width: f32) -> f32 {
-        match self.squircle_styles.border_mode.unwrap_or_default() {
-            BorderMode::Outside => -border_width,
-            BorderMode::Inside => border_width,
-            BorderMode::Center => 0.
+    fn get_size_and_border_offsets(&self, border_width: f32) -> (f32, f32) {
+        match self.style.border_mode.unwrap_or_default() {
+            BorderMode::Outside => (-border_width, border_width - 2.),
+            BorderMode::Inside => (border_width, -(border_width - 1.)),
+            BorderMode::Center => (0., 0.),
         }
     }
 }
 
-impl RenderOnce for Squircle {
-    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
-        canvas(
-            move |_, _, _| {},
+impl Element for Squircle {
+    type RequestLayoutState = Style;
+    type PrepaintState = Option<()>;
 
-            move |bounds, _, window, _| {
-                /*if self.squircle_styles.corner_radius == Some(8.) {
-                    println!("{}", bounds.size);
-                }*/
+    fn id(&self) -> Option<ElementId> {
+        self.interactivity.element_id.clone()
+    }
 
-                let squircle_styles = &self.squircle_styles;
+    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
+        self.interactivity.source_location()
+    }
 
-                match (
-                    squircle_styles.bg,
-                    squircle_styles.border_width
-                        .zip(self.squircle_styles.border_color)
-                ) {
-                    (Some(bg), None) => {
-                        self.build_and_paint_paths(window, bounds, 0., [
-                            BuildAndPaintOptions::fill(bg)
-                        ]);
-                    },
+    fn request_layout(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, Self::RequestLayoutState) {
+        let mut style = Style::default();
+        style.refine(&self.style.inner);
 
-                    (Some(bg), Some((border_width, border_color))) => {
-                        let border_offset = self.get_border_offset(border_width);
+        let layout_id = window.request_layout(style.clone(), [], cx);
+        (layout_id, style)
+    }
 
-                        if border_offset == 0. {
-                            // We can generate the same path for both the fill and the stroke.
+    fn prepaint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        _bounds: Bounds<Pixels>,
+        _request_layout: &mut Style,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<()> {
+        None
+    }
 
-                            self.build_and_paint_paths(window, bounds, 0., [
-                                BuildAndPaintOptions::fill(bg),
-                                BuildAndPaintOptions::stroke(border_color, border_width)
-                            ]);
+    fn paint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        style: &mut Style,
+        _prepaint: &mut Self::PrepaintState,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let style_refinement = &self.style;
 
-                        } else {
-                            // We need to generate differen't paths for the fill and
-                            // stroke as they have different corner radius's and size's.
+        style.refine(&style_refinement.inner);
 
-                            self.build_and_paint_paths(window, bounds, 0., [
-                                BuildAndPaintOptions::fill(bg),
-                            ]);
+        style.paint(bounds, window, cx, |window, _cx| {
+            match (style_refinement.background, style_refinement.border_color) {
+                (Some(bg), None) => {
+                    self.build_and_paint_paths(
+                        window,
+                        bounds,
+                        0.,
+                        0.,
+                        [BuildAndPaintOptions::fill(bg)],
+                    );
+                }
 
-                            self.build_and_paint_paths(window, bounds, border_offset, [
-                                BuildAndPaintOptions::stroke(border_color, border_width)
-                            ]);
-                        }
-                    },
+                (Some(bg), Some(border_color)) => {
+                    let border_width =
+                        style_refinement.border_width.unwrap_or_default().to_f64() as f32;
+                    let (size_offset, border_offset) =
+                        self.get_size_and_border_offsets(border_width);
 
-                    (None, None) => (),
+                    if size_offset == 0. {
+                        // We can generate the same path for both the fill and the stroke.
 
-                    (None, Some((border_width, border_color))) => {
                         self.build_and_paint_paths(
-                            window, bounds, self.get_border_offset(border_width),
-                            [ BuildAndPaintOptions::stroke(border_color, border_width) ]   
+                            window,
+                            bounds,
+                            0.,
+                            border_offset,
+                            [
+                                BuildAndPaintOptions::fill(bg),
+                                BuildAndPaintOptions::stroke(border_color, border_width),
+                            ],
                         );
-                    },
-                };
-            },
-        )
-            .size_full()
-            .absolute()
-            .top_0()
-            .bottom_0()
-            .left_0()
-            .right_0()
+                    } else {
+                        // We need to generate differen't paths for the fill and
+                        // stroke as they have different corner radius's and size's.
+
+                        self.build_and_paint_paths(
+                            window,
+                            bounds,
+                            0.,
+                            0.,
+                            [BuildAndPaintOptions::fill(bg)],
+                        );
+
+                        self.build_and_paint_paths(
+                            window,
+                            bounds,
+                            size_offset,
+                            border_offset,
+                            [BuildAndPaintOptions::stroke(border_color, border_width)],
+                        );
+                    }
+                }
+
+                (None, None) => (),
+
+                (None, Some(border_color)) => {
+                    let border_width =
+                        style_refinement.border_width.unwrap_or_default().to_f64() as f32;
+
+                    let (size_offset, border_offset) =
+                        self.get_size_and_border_offsets(border_width);
+
+                    self.build_and_paint_paths(
+                        window,
+                        bounds,
+                        size_offset,
+                        border_offset,
+                        [BuildAndPaintOptions::stroke(border_color, border_width)],
+                    );
+                }
+            }
+        });
     }
 }
+
+impl IntoElement for Squircle {
+    type Element = Self;
+
+    fn into_element(self) -> Self::Element {
+        self
+    }
+}
+
+impl InteractiveElement for Squircle {
+    fn interactivity(&mut self) -> &mut Interactivity {
+        &mut self.interactivity
+    }
+}
+
+impl StatefulInteractiveElement for Squircle {}
 
 pub fn squircle() -> Squircle {
     Squircle::new()

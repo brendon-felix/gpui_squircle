@@ -1,16 +1,16 @@
 [package]
 name = "gpui_squircle"
-version = "0.1.0"
+version = "1.0.0"
 authors = [ "cameronpcampbell" ]
 edition = "2024"
 description = "squircle component for gpui."
 license = "MIT"
-homepage = "https://github.com/gpui-elements/gpui-squircle"
+homepage = "https://github.com/astrum-chat/gpui_squircle"
 
 [dependencies]
-gpui = { git = "https://github.com/zed-industries/zed" }
-gpui_macros = { git = "https://github.com/zed-industries/zed" }
-#figma_squircle = { path = "../figma_squircle" }
+gpui = "0.2.2"
+gpui-macros = "0.2.2"
 figma_squircle = "0.1.0"
 lyon = { version = "1.0.16", features = [ "extra" ] }
 anyhow = "1.0.99"
+smallvec = "1.15.1"
