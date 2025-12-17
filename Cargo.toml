@@ -1,6 +1,6 @@
 [package]
 name = "gpui_squircle"
-version = "1.0.0"
+version = "1.0.1"
 authors = [ "cameronpcampbell" ]
 edition = "2024"
 description = "squircle component for gpui."

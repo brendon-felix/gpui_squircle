@@ -3,3 +3,5 @@
 # MacOS file system clutter.
 ._*
 .DS_STORE
+
+Cargo.lock

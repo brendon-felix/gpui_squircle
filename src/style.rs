@@ -1,9 +1,9 @@
 use gpui::{
-    AbsoluteLength, AlignContent, AlignItems, Background, BorderStyle, CornersRefinement,
-    CursorStyle, DefiniteLength, Display, FlexDirection, FlexWrap, Font, FontStyle, FontWeight,
-    GridPlacement, Hsla, JustifyContent, Length, Pixels, Refineable, SharedString, SizeRefinement,
-    StrikethroughStyle, StyleRefinement, TextAlign, TextOverflow, TextStyleRefinement,
-    UnderlineStyle, WhiteSpace, px, relative, rems,
+    px, relative, rems, AbsoluteLength, AlignContent, AlignItems, Background, BorderStyle,
+    CornersRefinement, CursorStyle, DefiniteLength, Display, FlexDirection, FlexWrap, Font,
+    FontStyle, FontWeight, GridPlacement, Hsla, JustifyContent, Length, Pixels, Refineable,
+    SharedString, SizeRefinement, StrikethroughStyle, StyleRefinement, TextAlign, TextOverflow,
+    TextStyleRefinement, UnderlineStyle, WhiteSpace,
 };
 
 use crate::BorderMode;
