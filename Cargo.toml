@@ -15,6 +15,7 @@ lyon = { version = "1.0.16", features = [ "extra" ] }
 anyhow = "1.0.99"
 smallvec = "1.15.1"
 
+[target.'cfg(target_os = "macos")'.dependencies]
 # Fixes "two different versions of crate `core_graphics` are being used" error.
 core-text = "=21.0.0"
 
