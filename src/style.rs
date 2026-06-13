@@ -1,9 +1,9 @@
 use gpui::{
     AbsoluteLength, AlignContent, AlignItems, Background, BorderStyle, CornersRefinement,
     CursorStyle, DefiniteLength, Display, FlexDirection, FlexWrap, Font, FontStyle, FontWeight,
-    GridPlacement, Hsla, JustifyContent, Length, Pixels, Refineable, SharedString, SizeRefinement,
-    StrikethroughStyle, StyleRefinement, TextAlign, TextOverflow, TextStyleRefinement,
-    UnderlineStyle, WhiteSpace, px, relative, rems,
+    GridPlacement, GridTemplate, Hsla, JustifyContent, Length, Pixels, Refineable, SharedString,
+    SizeRefinement, StrikethroughStyle, StyleRefinement, TemplateColumnMinSize, TextAlign,
+    TextOverflow, TextStyleRefinement, UnderlineStyle, WhiteSpace, px, relative, rems,
 };
 
 use crate::BorderMode;
@@ -32,6 +32,10 @@ pub struct SquircleStyleRefinement {
     pub border_color: Option<Background>,
     /// Fill color/background for the squircle.
     pub background: Option<Background>,
+    /// Background color when the element is hovered.
+    pub hover_bg: Option<Background>,
+    /// Background color when the element is active (pressed).
+    pub active_bg: Option<Background>,
 }
 
 impl SquircleStyleRefinement {
@@ -61,6 +65,14 @@ impl SquircleStyleRefinement {
 
         if let Some(background) = other.background {
             self.background = Some(background);
+        }
+
+        if let Some(hover_bg) = other.hover_bg {
+            self.hover_bg = Some(hover_bg);
+        }
+
+        if let Some(active_bg) = other.active_bg {
+            self.active_bg = Some(active_bg);
         }
 
         let corner_radii = other.corner_radii;
@@ -131,6 +143,18 @@ where
         self
     }
 
+    /// Sets the background color when the squircle is hovered.
+    fn bg_hover(mut self, color: impl Into<Background>) -> Self {
+        self.outer_style().hover_bg = Some(color.into());
+        self
+    }
+
+    /// Sets the background color when the squircle is active (pressed).
+    fn bg_active(mut self, color: impl Into<Background>) -> Self {
+        self.outer_style().active_bg = Some(color.into());
+        self
+    }
+
     /// Sets the border width in pixels.
     fn border(mut self, px: Pixels) -> Self {
         self.outer_style().border_width = Some(px);
@@ -140,6 +164,24 @@ where
     /// Sets the border color.
     fn border_color(mut self, color: impl Into<Background>) -> Self {
         self.outer_style().border_color = Some(color.into());
+        self
+    }
+
+    /// Sets a 1px border on all sides.
+    fn border_1(mut self) -> Self {
+        self.outer_style().border_width = Some(px(1.));
+        self
+    }
+
+    /// Sets the border width in pixels.
+    fn border_1p5(mut self) -> Self {
+        self.outer_style().border_width = Some(px(1.5));
+        self
+    }
+
+    /// Sets the border width in pixels.
+    fn border_2(mut self) -> Self {
+        self.outer_style().border_width = Some(px(2.));
         self
     }
 
@@ -208,6 +250,16 @@ where
         self.style().size = SizeRefinement {
             width: Some(size),
             height: Some(size),
+        };
+        self
+    }
+
+    /// Sets the element to fill its parent (width: 100%, height: 100%).
+    fn size_full(mut self) -> Self {
+        let full: Length = relative(1.).into();
+        self.style().size = SizeRefinement {
+            width: Some(full),
+            height: Some(full),
         };
         self
     }
@@ -826,13 +878,19 @@ where
 
     /// Sets the grid columns of this element.
     fn grid_cols(mut self, cols: u16) -> Self {
-        self.style().grid_cols = Some(cols);
+        self.style().grid_cols = Some(GridTemplate {
+            repeat: cols,
+            min_size: TemplateColumnMinSize::Zero,
+        });
         self
     }
 
     /// Sets the grid rows of this element.
     fn grid_rows(mut self, rows: u16) -> Self {
-        self.style().grid_rows = Some(rows);
+        self.style().grid_rows = Some(GridTemplate {
+            repeat: rows,
+            min_size: TemplateColumnMinSize::Zero,
+        });
         self
     }
 

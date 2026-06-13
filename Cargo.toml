@@ -8,8 +8,8 @@ license = "MIT"
 homepage = "https://github.com/astrum-chat/gpui_squircle"
 
 [dependencies]
-gpui = "0.2.2"
-gpui-macros = "0.2.2"
+gpui = { git = "https://github.com/zed-industries/zed" }
+gpui_macros = { git = "https://github.com/zed-industries/zed" }
 figma_squircle = "0.1.0"
 lyon = { version = "1.0.16", features = [ "extra" ] }
 anyhow = "1.0.99"
@@ -18,6 +18,3 @@ smallvec = "1.15.1"
 [target.'cfg(target_os = "macos")'.dependencies]
 # Fixes "two different versions of crate `core_graphics` are being used" error.
 core-text = "=21.0.0"
-
-[patch.crates-io]
-gpui = { git = "https://github.com/zed-industries/zed" }
